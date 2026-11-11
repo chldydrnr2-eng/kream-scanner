@@ -1,1 +1,1 @@
-{"version":"3.1.1","shell":"3.1.1","appZip":"https://raw.githubusercontent.com/chldydrnr2-eng/kream-scanner/main/updates/app-3.1.1.zip","installer":"https://github.com/chldydrnr2-eng/kream-scanner/raw/main/updates/KreamScanner-Setup-3.1.1.exe","notes":"쇼핑몰 화면 읽기가 멈추던 문제 수정, 이후 업데이트는 전부 자동"}
+{"version":"3.2.0","shell":"3.1.1","appZip":"https://raw.githubusercontent.com/chldydrnr2-eng/kream-scanner/main/updates/app-3.2.0.zip","installer":"https://github.com/chldydrnr2-eng/kream-scanner/raw/main/updates/KreamScanner-Setup-3.1.1.exe","notes":"로그인 확인 빨라짐 · 새 디자인 · 리셀올인원 메뉴 구성"}
