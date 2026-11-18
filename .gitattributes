@@ -1,1 +1,2 @@
 updates/KreamScanner-Setup-3.6.0.exe filter=lfs diff=lfs merge=lfs -text
+updates/KickScan-Setup-3.36.1.exe filter=lfs diff=lfs merge=lfs -text
