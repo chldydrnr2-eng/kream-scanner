@@ -10,6 +10,7 @@ h1{margin:0;font-size:19px}.head p{margin:0;font-size:12.5px;color:var(--sub)}
 .sum dt{color:var(--sub)}.sum dd{margin:0;text-align:right;font-weight:700}.sum .amt{font-size:22px;font-weight:900;color:var(--brand)}
 .box{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
 button{width:100%;margin-top:14px;border:0;border-radius:14px;padding:15px;font-size:16px;font-weight:800;color:#fff;background:linear-gradient(180deg,#6a6cff,#4b4ef0);cursor:pointer}button:disabled{opacity:.5;cursor:wait}
+.pm{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:14px}.pm label{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:12px;padding:12px;font-weight:700;cursor:pointer}.pm label:has(input:checked){border-color:var(--brand);background:#f0f0ff}.pm small{display:block;font-weight:500;color:var(--sub);font-size:12px}.note{padding:0 14px 14px;font-size:12.5px;color:var(--sub)}
 .msg{margin-top:10px;font-size:13px;color:#b4371f;text-align:center;min-height:1em}
 </style></head><body><div class="wrap">
 <div class="head"><div class="logo">KS</div><div><h1>킥스캔 이용권 결제</h1><p>결제가 끝나면 킥스캔이 자동으로 이용권을 반영해요.</p></div></div>
@@ -23,6 +24,27 @@ button{width:100%;margin-top:14px;border:0;border-radius:14px;padding:15px;font-
   const ck = q.get('ck'), cust = q.get('cust'), oid = q.get('oid'), amt = +q.get('amt'), name = q.get('name') || '킥스캔 이용권';
   $('name').textContent = name; $('amt').textContent = amt ? amt.toLocaleString('ko-KR') + '원' : '-';
   if (!ck || !cust || !oid || !amt) { $('msg').textContent = '주문 정보가 없어요. 킥스캔에서 다시 결제해 주세요.'; return; }
+  const base = location.href.replace(/[^/]*(\?.*)?$/, '');
+  // API 개별 연동 키(test_ck_ · live_ck_): 결제수단을 고르면 토스 결제창이 떠요
+  if (/^(test|live)_ck_/.test(ck)) {
+    try {
+      const pay = TossPayments(ck).payment({ customerKey: cust });
+      const M = [['CARD', '카드 · 간편결제', '토스페이 · 카카오페이 · 네이버페이 등'], ['TRANSFER', '계좌이체', '은행 계좌에서 바로'], ['VIRTUAL_ACCOUNT', '가상계좌', '입금하면 자동 반영'], ['MOBILE_PHONE', '휴대폰', '통신사 소액결제']];
+      $('payment-method').innerHTML = '<div class="pm">' + M.map((m, i) => `<label><input type="radio" name="pm" value="${m[0]}"${i ? '' : ' checked'}><span>${m[1]}<small>${m[2]}</small></span></label>`).join('') + '</div><p class="note">결제하기를 누르면 토스페이먼츠 결제창이 열려요.</p>';
+      const btn = $('pay'); btn.disabled = false; btn.textContent = amt.toLocaleString('ko-KR') + '원 결제하기';
+      btn.onclick = async () => {
+        btn.disabled = true; $('msg').textContent = '';
+        const method = (document.querySelector('input[name=pm]:checked') || {}).value || 'CARD';
+        const o = { method, amount: { currency: 'KRW', value: amt }, orderId: oid, orderName: name, successUrl: base + 'success.html', failUrl: base + 'fail.html' };
+        if (method === 'CARD') o.card = { flowMode: 'DEFAULT', useEscrow: false, useCardPoint: false, useAppCardOnly: false };
+        if (method === 'TRANSFER') o.transfer = { cashReceipt: { type: '소득공제' }, useEscrow: false };
+        if (method === 'VIRTUAL_ACCOUNT') o.virtualAccount = { cashReceipt: { type: '소득공제' }, useEscrow: false, validHours: 24 };
+        try { await pay.requestPayment(o); }
+        catch (e) { $('msg').textContent = e && e.message ? e.message : '결제를 진행하지 못했어요'; btn.disabled = false; }
+      };
+    } catch (e) { $('msg').textContent = '결제 화면을 불러오지 못했어요: ' + (e && e.message || e); }
+    return;
+  }
   try {
     const widgets = TossPayments(ck).widgets({ customerKey: cust });
     await widgets.setAmount({ currency: 'KRW', value: amt });
@@ -30,7 +52,6 @@ button{width:100%;margin-top:14px;border:0;border-radius:14px;padding:15px;font-
     const btn = $('pay'); btn.disabled = false; btn.textContent = amt.toLocaleString('ko-KR') + '원 결제하기';
     btn.onclick = async () => {
       btn.disabled = true; $('msg').textContent = '';
-      const base = location.href.replace(/[^/]*(\?.*)?$/, '');
       try { await widgets.requestPayment({ orderId: oid, orderName: name, successUrl: base + 'success.html', failUrl: base + 'fail.html' }); }
       catch (e) { $('msg').textContent = e && e.message ? e.message : '결제를 진행하지 못했어요'; btn.disabled = false; }
     };
