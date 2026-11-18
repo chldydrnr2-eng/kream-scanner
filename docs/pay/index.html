@@ -3,14 +3,14 @@
 <style>
 :root{--bg:#f4f5fb;--panel:#fff;--ink:#14162b;--sub:#5e6481;--line:#e3e6f2;--brand:#5b5bf7}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif}
-.wrap{max-width:560px;margin:0 auto;padding:22px max(16px,env(safe-area-inset-left,0px)) 40px}
+.wrap{max-width:640px;margin:0 auto;padding:22px max(16px,env(safe-area-inset-left,0px)) 40px}
 .head{display:flex;align-items:center;gap:12px;margin-bottom:16px}.logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#5b7cff,#8b5cf6);color:#fff;display:grid;place-items:center;font-weight:900}
 h1{margin:0;font-size:19px}.head p{margin:0;font-size:12.5px;color:var(--sub)}
 .sum{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:14px;margin-bottom:12px}
 .sum dt{color:var(--sub)}.sum dd{margin:0;text-align:right;font-weight:700}.sum .amt{font-size:22px;font-weight:900;color:var(--brand)}
 .box{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
 button{width:100%;margin-top:14px;border:0;border-radius:14px;padding:15px;font-size:16px;font-weight:800;color:#fff;background:linear-gradient(180deg,#6a6cff,#4b4ef0);cursor:pointer}button:disabled{opacity:.5;cursor:wait}
-.pm{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:14px}.pm label{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:12px;padding:12px;font-weight:700;cursor:pointer}.pm label:has(input:checked){border-color:var(--brand);background:#f0f0ff}.pm small{display:block;font-weight:500;color:var(--sub);font-size:12px}.note{padding:0 14px 14px;font-size:12.5px;color:var(--sub)}
+.pm{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding:14px}.pm-h{margin:14px 14px 0;font-size:12.5px;font-weight:800;color:var(--sub)}.pm-h+.pm{padding-top:8px}.ep{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:12px;font-weight:900}.pm label{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:12px;padding:12px;font-weight:700;cursor:pointer}.pm label:has(input:checked){border-color:var(--brand);background:#f0f0ff}.pm small{display:block;font-weight:500;color:var(--sub);font-size:12px}.note{padding:0 14px 14px;font-size:12.5px;color:var(--sub)}
 .msg{margin-top:10px;font-size:13px;color:#b4371f;text-align:center;min-height:1em}
 </style></head><body><div class="wrap">
 <div class="head"><div class="logo">KS</div><div><h1>킥스캔 이용권 결제</h1><p>결제가 끝나면 킥스캔이 자동으로 이용권을 반영해요.</p></div></div>
@@ -20,6 +20,7 @@ button{width:100%;margin-top:14px;border:0;border-radius:14px;padding:15px;font-
 </div>
 <script>
 (async () => {
+  try { if (window.outerWidth < 880) window.resizeTo(900, Math.max(window.outerHeight, 840)); } catch (e) {}   // 토스 결제창이 잘리지 않게 창을 넓혀요
   const q = new URLSearchParams(location.search), $ = id => document.getElementById(id);
   const ck = q.get('ck'), cust = q.get('cust'), oid = q.get('oid'), amt = +q.get('amt'), name = q.get('name') || '킥스캔 이용권';
   $('name').textContent = name; $('amt').textContent = amt ? amt.toLocaleString('ko-KR') + '원' : '-';
@@ -29,14 +30,23 @@ button{width:100%;margin-top:14px;border:0;border-radius:14px;padding:15px;font-
   if (/^(test|live)_ck_/.test(ck)) {
     try {
       const pay = TossPayments(ck).payment({ customerKey: cust });
-      const M = [['CARD', '카드 · 간편결제', '토스페이 · 카카오페이 · 네이버페이 등'], ['TRANSFER', '계좌이체', '은행 계좌에서 바로'], ['VIRTUAL_ACCOUNT', '가상계좌', '입금하면 자동 반영'], ['MOBILE_PHONE', '휴대폰', '통신사 소액결제']];
-      $('payment-method').innerHTML = '<div class="pm">' + M.map((m, i) => `<label><input type="radio" name="pm" value="${m[0]}"${i ? '' : ' checked'}><span>${m[1]}<small>${m[2]}</small></span></label>`).join('') + '</div><p class="note">결제하기를 누르면 토스페이먼츠 결제창이 열려요.</p>';
+      // 간편결제는 바로 그 앱 결제창으로, 나머지는 토스 결제창으로 열어요
+      // 간편결제 버튼은 토스와 계약된 것만 보여요 → config.json 의 easyPay 목록 (계약 안 된 수단을 누르면 '지원되지 않는 간편결제 수단' 오류가 나요)
+      const ALL_EP = { TOSSPAY: ['토스페이', '#0064ff', '#fff', 't'], KAKAOPAY: ['카카오페이', '#ffe300', '#191919', 'k'], NAVERPAY: ['네이버페이', '#03c75a', '#fff', 'N'], PAYCO: ['페이코', '#ff2b2b', '#fff', 'P'], SAMSUNGPAY: ['삼성페이', '#1428a0', '#fff', 'S'] };
+      let cfg = {}; try { cfg = await (await fetch('config.json', { cache: 'no-store' })).json(); } catch (e) {}
+      const EP = (Array.isArray(cfg.easyPay) ? cfg.easyPay : []).filter(k => ALL_EP[k]).map(k => [k, ...ALL_EP[k]]);
+      const M = [['CARD', '신용 · 체크카드', EP.length ? '카드사 선택' : '카드 · 계약된 간편결제'], ['TRANSFER', '계좌이체', '은행 계좌에서 바로'], ['VIRTUAL_ACCOUNT', '가상계좌', '입금하면 자동 반영'], ['MOBILE_PHONE', '휴대폰', '통신사 소액결제']];
+      const opt = (v, t, sub, i, badge) => `<label><input type="radio" name="pm" value="${v}"${i ? '' : ' checked'}>${badge || ''}<span>${t}<small>${sub}</small></span></label>`;
+      $('payment-method').innerHTML = (EP.length ? '<p class="pm-h">간편결제</p><div class="pm">' + EP.map((e, i) => opt('EASY:' + e[0], e[1], '앱으로 바로 결제', i, `<span class="ep" style="background:${e[2]};color:${e[3]}">${e[4]}</span>`)).join('') + '</div>' : '')
+        + '<p class="pm-h">' + (EP.length ? '일반결제' : '결제수단') + '</p><div class="pm">' + M.map((m, i) => opt(m[0], m[1], m[2], EP.length ? 1 : i)).join('') + '</div><p class="note">결제하기를 누르면 토스페이먼츠 결제창이 열려요.</p>';
       const btn = $('pay'); btn.disabled = false; btn.textContent = amt.toLocaleString('ko-KR') + '원 결제하기';
       btn.onclick = async () => {
         btn.disabled = true; $('msg').textContent = '';
         const method = (document.querySelector('input[name=pm]:checked') || {}).value || 'CARD';
-        const o = { method, amount: { currency: 'KRW', value: amt }, orderId: oid, orderName: name, successUrl: base + 'success.html', failUrl: base + 'fail.html' };
-        if (method === 'CARD') o.card = { flowMode: 'DEFAULT', useEscrow: false, useCardPoint: false, useAppCardOnly: false };
+        const easy = method.startsWith('EASY:') ? method.slice(5) : '';
+        const o = { method: easy ? 'CARD' : method, amount: { currency: 'KRW', value: amt }, orderId: oid, orderName: name, successUrl: base + 'success.html', failUrl: base + 'fail.html' };
+        if (easy) o.card = { flowMode: 'DIRECT', easyPay: easy, useEscrow: false, useCardPoint: false, useAppCardOnly: false };
+        else if (method === 'CARD') o.card = { flowMode: 'DEFAULT', useEscrow: false, useCardPoint: false, useAppCardOnly: false };
         if (method === 'TRANSFER') o.transfer = { cashReceipt: { type: '소득공제' }, useEscrow: false };
         if (method === 'VIRTUAL_ACCOUNT') o.virtualAccount = { cashReceipt: { type: '소득공제' }, useEscrow: false, validHours: 24 };
         try { await pay.requestPayment(o); }
