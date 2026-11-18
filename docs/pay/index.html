@@ -1,0 +1,39 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>킥스캔 이용권 결제</title>
+<script src="https://js.tosspayments.com/v2/standard"></script>
+<style>
+:root{--bg:#f4f5fb;--panel:#fff;--ink:#14162b;--sub:#5e6481;--line:#e3e6f2;--brand:#5b5bf7}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif}
+.wrap{max-width:560px;margin:0 auto;padding:22px max(16px,env(safe-area-inset-left,0px)) 40px}
+.head{display:flex;align-items:center;gap:12px;margin-bottom:16px}.logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#5b7cff,#8b5cf6);color:#fff;display:grid;place-items:center;font-weight:900}
+h1{margin:0;font-size:19px}.head p{margin:0;font-size:12.5px;color:var(--sub)}
+.sum{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:14px;margin-bottom:12px}
+.sum dt{color:var(--sub)}.sum dd{margin:0;text-align:right;font-weight:700}.sum .amt{font-size:22px;font-weight:900;color:var(--brand)}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+button{width:100%;margin-top:14px;border:0;border-radius:14px;padding:15px;font-size:16px;font-weight:800;color:#fff;background:linear-gradient(180deg,#6a6cff,#4b4ef0);cursor:pointer}button:disabled{opacity:.5;cursor:wait}
+.msg{margin-top:10px;font-size:13px;color:#b4371f;text-align:center;min-height:1em}
+</style></head><body><div class="wrap">
+<div class="head"><div class="logo">KS</div><div><h1>킥스캔 이용권 결제</h1><p>결제가 끝나면 킥스캔이 자동으로 이용권을 반영해요.</p></div></div>
+<dl class="sum"><dt>상품</dt><dd id="name">-</dd><dt>결제 금액</dt><dd class="amt" id="amt">-</dd></dl>
+<div class="box"><div id="payment-method"></div><div id="agreement"></div></div>
+<button id="pay" disabled>결제하기</button><p class="msg" id="msg"></p>
+</div>
+<script>
+(async () => {
+  const q = new URLSearchParams(location.search), $ = id => document.getElementById(id);
+  const ck = q.get('ck'), cust = q.get('cust'), oid = q.get('oid'), amt = +q.get('amt'), name = q.get('name') || '킥스캔 이용권';
+  $('name').textContent = name; $('amt').textContent = amt ? amt.toLocaleString('ko-KR') + '원' : '-';
+  if (!ck || !cust || !oid || !amt) { $('msg').textContent = '주문 정보가 없어요. 킥스캔에서 다시 결제해 주세요.'; return; }
+  try {
+    const widgets = TossPayments(ck).widgets({ customerKey: cust });
+    await widgets.setAmount({ currency: 'KRW', value: amt });
+    await Promise.all([widgets.renderPaymentMethods({ selector: '#payment-method', variantKey: 'DEFAULT' }), widgets.renderAgreement({ selector: '#agreement', variantKey: 'AGREEMENT' })]);
+    const btn = $('pay'); btn.disabled = false; btn.textContent = amt.toLocaleString('ko-KR') + '원 결제하기';
+    btn.onclick = async () => {
+      btn.disabled = true; $('msg').textContent = '';
+      const base = location.href.replace(/[^/]*(\?.*)?$/, '');
+      try { await widgets.requestPayment({ orderId: oid, orderName: name, successUrl: base + 'success.html', failUrl: base + 'fail.html' }); }
+      catch (e) { $('msg').textContent = e && e.message ? e.message : '결제를 진행하지 못했어요'; btn.disabled = false; }
+    };
+  } catch (e) { $('msg').textContent = '결제 화면을 불러오지 못했어요: ' + (e && e.message || e); }
+})();
+</script></body></html>
