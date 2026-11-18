@@ -35,7 +35,9 @@ button{width:100%;margin-top:14px;border:0;border-radius:14px;padding:15px;font-
       const ALL_EP = { TOSSPAY: ['토스페이', '#0064ff', '#fff', 't'], KAKAOPAY: ['카카오페이', '#ffe300', '#191919', 'k'], NAVERPAY: ['네이버페이', '#03c75a', '#fff', 'N'], PAYCO: ['페이코', '#ff2b2b', '#fff', 'P'], SAMSUNGPAY: ['삼성페이', '#1428a0', '#fff', 'S'] };
       let cfg = {}; try { cfg = await (await fetch('config.json', { cache: 'no-store' })).json(); } catch (e) {}
       const EP = (Array.isArray(cfg.easyPay) ? cfg.easyPay : []).filter(k => ALL_EP[k]).map(k => [k, ...ALL_EP[k]]);
-      const M = [['CARD', '신용 · 체크카드', EP.length ? '카드사 선택' : '카드 · 계약된 간편결제'], ['TRANSFER', '계좌이체', '은행 계좌에서 바로'], ['VIRTUAL_ACCOUNT', '가상계좌', '입금하면 자동 반영'], ['MOBILE_PHONE', '휴대폰', '통신사 소액결제']];
+      // 일반 결제수단도 계약된 것만 보여요 → config.json 의 methods 목록 (없으면 카드 · 계좌이체 · 가상계좌)
+      const ALL_M = { CARD: ['신용 · 체크카드', EP.length ? '카드사 선택' : '카드 · 계약된 간편결제'], TRANSFER: ['계좌이체', '은행 계좌에서 바로'], VIRTUAL_ACCOUNT: ['가상계좌', '입금하면 자동 반영'], MOBILE_PHONE: ['휴대폰', '통신사 소액결제'] };
+      const M = (Array.isArray(cfg.methods) && cfg.methods.length ? cfg.methods : ['CARD', 'TRANSFER', 'VIRTUAL_ACCOUNT']).filter(k => ALL_M[k]).map(k => [k, ...ALL_M[k]]);
       const opt = (v, t, sub, i, badge) => `<label><input type="radio" name="pm" value="${v}"${i ? '' : ' checked'}>${badge || ''}<span>${t}<small>${sub}</small></span></label>`;
       $('payment-method').innerHTML = (EP.length ? '<p class="pm-h">간편결제</p><div class="pm">' + EP.map((e, i) => opt('EASY:' + e[0], e[1], '앱으로 바로 결제', i, `<span class="ep" style="background:${e[2]};color:${e[3]}">${e[4]}</span>`)).join('') + '</div>' : '')
         + '<p class="pm-h">' + (EP.length ? '일반결제' : '결제수단') + '</p><div class="pm">' + M.map((m, i) => opt(m[0], m[1], m[2], EP.length ? 1 : i)).join('') + '</div><p class="note">결제하기를 누르면 토스페이먼츠 결제창이 열려요.</p>';

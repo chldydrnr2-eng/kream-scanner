@@ -1,1 +1,1 @@
-{"easyPay": []}
+{"easyPay": [], "methods": ["CARD", "TRANSFER", "VIRTUAL_ACCOUNT"]}
