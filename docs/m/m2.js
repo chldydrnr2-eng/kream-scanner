@@ -67,12 +67,12 @@
   function vScan() {
     if (DOC_OK === false) return '<div class="empty"><b>서버 준비 전이에요</b>' + esc(DOC_ERR) + '</div>';
     var D = day(), S = stores(), h = '';
-    h += '<div class="box sc-day"><div class="sc-row"><b>오늘 매장</b>' + (D ? '<span>' + esc(D.store) + ' · 할인 ' + (+D.disc || 0) + '%</span><button type="button" class="linkbtn" data-sc="dayEdit">다른 매장 ›</button>' : '<span class="sub">하루 한 번 골라 주세요</span>') + '</div>' +
-      (!D || SC.dayEdit ? '<div class="sc-dayf"><select data-sc-k="store"><option value="">매장 고르기</option>' + S.map(function (p) { return '<option value="' + esc(p._id) + '"' + (D && D.storeId === p._id ? ' selected' : '') + '>' + esc(p.name) + (p.lastDisc != null ? ' · 지난 할인 ' + p.lastDisc + '%' : '') + '</option>'; }).join('') + '<option value="_new">+ 직접 입력</option></select><input type="text" data-sc-k="storeNew" placeholder="매장 이름" hidden><input type="number" inputmode="decimal" data-sc-k="disc" placeholder="오늘 할인율 %" value="' + (D ? +D.disc || '' : '') + '"><button type="button" class="primary" data-sc="daySave">이 매장으로 스캔</button></div>' : '') + '</div>';
-    if (!D) return h;
-    h += '<div class="sc-bar"><button type="button" class="primary wide" data-sc="cam">' + (SC.cam ? '카메라 끄기' : '카메라로 바코드 스캔') + '</button></div>' +
+    // 스캔이 먼저 — 카메라 · 입력칸이 맨 위. 매장 · 할인율은 선택(넣으면 태그가에서 매입가를 바로 계산해요)
+    h += '<div class="sc-bar"><button type="button" class="primary wide" data-sc="cam">' + (SC.cam ? '카메라 끄기' : (SC.hit ? '다음 상품 스캔' : '카메라로 바코드 스캔')) + '</button></div>' +
       (SC.cam ? '<div class="sc-cam"><video id="scVideo" playsinline muted></video><div class="sc-frame"></div></div>' : '') +
       '<div class="filters sc-q"><input type="search" data-sc-k="q" placeholder="바코드 또는 품번 — 예: DD1391-100" value="' + esc(SC.q) + '" inputmode="text" autocomplete="off"><button type="button" class="ghost" data-sc="find">찾기</button></div>';
+    h += '<div class="sc-day1"><span class="sub">매장 · 할인율 (선택)</span> ' + (D ? '<b>' + esc(D.store || '매장 없음') + ' · 할인 ' + (+D.disc || 0) + '%</b>' : '<span class="sub">안 넣으면 태그가를 그대로 매입가로 봐요</span>') + (SC.dayEdit ? '' : ' <button type="button" class="linkbtn" data-sc="dayEdit">' + (D ? '바꾸기' : '넣기') + '</button>') + '</div>';
+    if (SC.dayEdit) h += '<div class="box sc-day">' + '<div class="sc-dayf"><select data-sc-k="store"><option value="">매장 고르기</option>' + S.map(function (p) { return '<option value="' + esc(p._id) + '"' + (D && D.storeId === p._id ? ' selected' : '') + '>' + esc(p.name) + (p.lastDisc != null ? ' · 지난 할인 ' + p.lastDisc + '%' : '') + '</option>'; }).join('') + '<option value="_new">+ 직접 입력</option></select><input type="text" data-sc-k="storeNew" placeholder="매장 이름" hidden><input type="number" inputmode="decimal" data-sc-k="disc" placeholder="오늘 할인율 %" value="' + (D ? +D.disc || '' : '') + '"><button type="button" class="primary" data-sc="daySave">저장</button></div>' + '</div>';
     if (SC.msg) h += '<p class="banner info">' + esc(SC.msg) + '</p>';
     if (!SC.hit || SC.ocr) h += vOcr();
     if (SC.hit) h += vJudge();
@@ -332,7 +332,10 @@
   K.VIEWS.stock = vStock2;
   K.VIEWS.set = vSet;
   K.VIEWS.mkt = function () { return K.vMkt(); };
-  K.VIEWS.scan.after = function () { if (SC.cam && !SC.stream) camStart(); };
+  K.VIEWS.scan.after = function () {
+    if (!SC.camAuto && !SC.hit && !SC.cam && !SC.dayEdit && DOC_OK !== false) { SC.camAuto = true; SC.cam = true; return K.render(); }
+    if (SC.cam && !SC.stream) camStart();
+  };
   // 홈 위에 반품 기한 임박 (전날 · 당일)
   var sum0 = null;
   K.onLoad = function () { docsLoad().then(function () { return flush(); }).then(function () { if (['scan', 'stock', 'set', 'sum'].indexOf(UI.tab) >= 0) K.render(); }); };
@@ -353,12 +356,12 @@
     if (a === 'daySave') {
       var sel = document.querySelector('[data-sc-k=store]'), nw = document.querySelector('[data-sc-k=storeNew]'), disc = +(document.querySelector('[data-sc-k=disc]') || {}).value || 0;
       var sid = sel ? sel.value : '', name = sid === '_new' ? (nw ? nw.value.trim() : '') : sid && DOC.partner[sid] ? DOC.partner[sid].name : '';
-      if (!name) { SC.msg = '매장을 골라 주세요'; return K.render(); }
+      if (!name && !disc) { SC.dayEdit = false; return K.render(); }
       var d = { date: today(), store: name, storeId: sid === '_new' ? '' : sid, disc: disc }; LS.set('day', JSON.stringify(d)); SC.dayEdit = false; SC.msg = '';
       send([{ kind: 'store_day', id: today(), data: d }]).catch(function () {});
       return K.render();
     }
-    if (a === 'cam') { if (SC.cam) camStop(); else SC.cam = true; return K.render(); }
+    if (a === 'cam') { if (SC.cam) camStop(); else { SC.cam = true; SC.hit = null; SC.ocr = null; SC.msg = ''; SC.q = ''; } return K.render(); }
     if (a === 'find') return scFind((document.querySelector('[data-sc-k=q]') || {}).value);
     if (a === 'quote') { SC.job = null; return scQuote(); }
     if (a === 'pick') { SC.size = b.dataset.v; return K.render(); }
