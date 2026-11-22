@@ -320,6 +320,78 @@
     h += '<div class="tot"><span><b>' + G.length + '</b>종 · <b>' + G.reduce(function (s, g) { return s + g.q; }, 0) + '</b>개</span><span>오늘 매입 <b>' + esc(won(todayBuy)) + '</b></span></div>';
     return h + '<div class="list">' + (G.map(function (g) { return '<div class="it"><div class="h"><span>' + esc(g.it.code || '') + '</span>' + (g.due != null ? '<span class="pill ' + (g.due <= 3 ? 'bad' : 'warn') + '">반품 D-' + g.due + '</span>' : '') + '</div><div class="n">' + esc(g.it.name || g.it.code || '') + '</div><div class="f"><span class="sub">평균 매입 ' + esc(won(g.q ? g.v / g.q : 0)) + '</span><span><b>' + g.q + '개</b></span></div><div class="sizes">' + Object.keys(g.s).map(function (s) { return '<span>' + esc(s) + ' <b>×' + g.s[s] + '</b></span>'; }).join('') + '</div></div>'; }).join('') || '<div class="empty">조건에 맞는 재고가 없어요</div>') + '</div>';
   }
+  // ---------- 영수증 등록 (J7): 나이키 · 아디다스 매장 영수증 → 상품 · 사이즈 · 실제 결제액(쿠폰 나눠 뺌) · 매입일 · 매장 · 카드 ----------
+  // 글자 인식은 이 휴대폰 안에서(tesseract 한국어 + 영어) — 사진은 서버로 안 보내요. 읽은 값은 고쳐서 등록해요.
+  var RS = null, RCW = null;
+  function rcWorker() {
+    if (!RCW) { RCW = loadJs(TESS_URL).then(function () { return window.Tesseract.createWorker(['kor', 'eng']); }); RCW.catch(function () { RCW = null; }); }
+    return RCW;
+  }
+  function tessWords(d) {
+    var W = [], push = function (w) { if (w && w.text && w.bbox) W.push([w.text, w.bbox.x0, w.bbox.y0, w.bbox.x1 - w.bbox.x0, w.bbox.y1 - w.bbox.y0]); };
+    if (d.words && d.words.length) d.words.forEach(push);
+    else (d.blocks || []).forEach(function (b) { (b.paragraphs || []).forEach(function (p) { (p.lines || []).forEach(function (l) { (l.words || []).forEach(push); }); }); });
+    return W;
+  }
+  function rcPick() { var f = document.getElementById('rcFile'); if (f) { f.value = ''; f.click(); } }
+  function rcRun(file) {
+    RS = { busy: true }; K.render();
+    imgCanvas(file).then(function (c) { return rcWorker().then(function (w) { return w.recognize(c, {}, { text: true, blocks: true }); }); }).then(function (res) {
+      var codes = []; Object.keys(DOC.item).forEach(function (k) { String(DOC.item[k].code || '').split('/').forEach(function (c) { if (c) codes.push(c); }); });
+      var r = window.RC.parse(tessWords((res && res.data) || {}), { codes: codes }), D = day();
+      var st = window.RC.matchStore(r.store, r.brand, stores()), pay = null;
+      if (r.card) Object.keys(DOC.pay).forEach(function (k) { var p = DOC.pay[k]; if (r.card.last4 && p.last4 === r.card.last4) pay = p; else if (!pay && r.card.co && String((p.issuer || '') + ' ' + (p.name || '')).indexOf(r.card.co) >= 0) pay = p; });
+      var rows = [];
+      r.items.forEach(function (x) {
+        var it = itemByCode(x.code), code = it ? String(it.code || '').split('/')[0] : x.code;
+        var same = rows.filter(function (y) { return y.code === code && y.size === x.size && +y.cost === x.cost; })[0];
+        if (same) same.qty += x.qty; else rows.push({ code: code, name: (it && it.name) || x.name || '', brand: (it && it.brand) || r.brand || '', size: x.size || '', qty: x.qty, cost: x.cost || '', on: true });
+      });
+      RS = { r: r, rows: rows, date: r.date || today(), storeId: st ? st._id : (D && D.storeId) || '', store: st ? st.name : (r.store || (D && D.store) || ''), payId: pay ? pay._id : '', msg: '' };
+      if (!rows.length) RS.err = r.warn[0] || '품번을 못 읽었어요';
+      K.render();
+    }).catch(function (e) { RS = { err: ((e && e.message) || '영수증을 못 읽었어요') + ' — 인터넷이 되는 곳에서 다시 해 주세요(처음 한 번 글자 자료를 받아요)' }; K.render(); });
+  }
+  function vRc() {
+    var h = '<div class="box rc"><div class="sc-row"><b>영수증 등록</b><button type="button" class="linkbtn" data-rc="close">닫기</button></div>';
+    if (RS.busy) return h + '<p class="note">영수증 글자를 읽는 중… 처음 한 번은 한국어 글자 자료를 받느라 30초쯤 걸려요.</p></div>';
+    if (RS.done) return h + '<p class="banner info">' + esc(RS.done) + '</p><button type="button" class="primary wide" data-rc="pick">영수증 하나 더</button></div>';
+    if (!RS.rows || !RS.rows.length) return h + '<p class="banner">' + esc(RS.err || '품번을 못 읽었어요') + '</p><p class="note">영수증을 평평하게 펴고, 밝은 곳에서 상품 줄이 화면을 꽉 채우게 찍어 주세요. 길면 반씩 나눠 찍어도 돼요.</p><button type="button" class="primary wide" data-rc="pick">다시 찍기</button></div>';
+    var r = RS.r, S = stores(), on = RS.rows.filter(function (x) { return x.on; });
+    var sum = on.reduce(function (t, x) { return t + (+x.cost || 0) * (+x.qty || 0); }, 0), n = on.reduce(function (t, x) { return t + (+x.qty || 0); }, 0);
+    var bits = [r.paid ? '결제 ' + won(r.paid) : '', r.extraDisc ? '쿠폰 · 추가 할인 ' + won(r.extraDisc) + '은 상품 금액 비율로 나눠 뺐어요' : '', r.card ? ('카드 ' + (r.card.co || '') + ' ' + (r.card.last4 || '')).trim() : ''].filter(Boolean);
+    h += '<p class="note">' + esc(bits.join(' · ')) + '</p>';
+    if (r.warn.length) h += '<p class="banner">' + r.warn.map(esc).join('<br>') + '</p>';
+    var inS = S.some(function (p) { return p._id === RS.storeId; });
+    h += '<div class="sc-calc"><label>매입일<input type="date" data-rc-k="date" value="' + esc(RS.date) + '"></label><label>매장<select data-rc-k="store">' + (inS ? '' : '<option value="">' + esc(RS.store ? RS.store + ' (새 매장)' : '매장 고르기') + '</option>') +
+      S.map(function (p) { return '<option value="' + esc(p._id) + '"' + (p._id === RS.storeId ? ' selected' : '') + '>' + esc(p.name) + '</option>'; }).join('') + '</select></label>' +
+      '<label>결제 카드<select data-rc-k="pay"><option value="">선택 안 함</option>' + Object.keys(DOC.pay).map(function (k) { var p = DOC.pay[k]; return '<option value="' + esc(p._id) + '"' + (RS.payId === p._id ? ' selected' : '') + '>' + esc(p.name + (p.last4 ? ' ' + p.last4 : '')) + '</option>'; }).join('') + '</select></label></div>';
+    h += '<div class="rc-list">' + RS.rows.map(function (x, i) {
+      return '<div class="rc-it' + (x.on ? '' : ' off') + '"><label class="rc-on"><input type="checkbox" data-rc-i="' + i + '" data-rc-f="on"' + (x.on ? ' checked' : '') + '><span><b>' + esc(x.code) + '</b> ' + esc(x.name || '') + '</span></label>' +
+        '<div class="sc-calc"><label>사이즈<input data-rc-i="' + i + '" data-rc-f="size" value="' + esc(x.size) + '" placeholder="예: 270"></label><label>수량<input type="number" min="1" inputmode="numeric" data-rc-i="' + i + '" data-rc-f="qty" value="' + esc(x.qty) + '"></label><label>개당 매입가<input type="number" inputmode="numeric" data-rc-i="' + i + '" data-rc-f="cost" value="' + esc(x.cost) + '"></label></div></div>';
+    }).join('') + '</div>';
+    if (r.paid && Math.abs(sum - r.paid) > 10) h += '<p class="note">고른 상품 합 ' + esc(won(sum)) + ' — 결제 ' + esc(won(r.paid)) + '와 ' + esc(won(Math.abs(sum - r.paid))) + ' 달라요</p>';
+    if (RS.msg) h += '<p class="banner">' + esc(RS.msg) + '</p>';
+    h += '<button type="button" class="primary wide" data-rc="save"' + (n ? '' : ' disabled') + '>' + n + '개 매입 등록</button><div class="sc-row" style="margin-top:8px"><button type="button" class="ghost" data-rc="pick">다시 찍기</button><button type="button" class="linkbtn" data-rc="rows">' + (RS.showRows ? '읽은 글자 접기' : '읽은 글자 보기') + '</button></div>';
+    if (RS.showRows) h += '<pre class="rc-rows">' + esc(r.rows.join('\n')) + '</pre>';
+    return h + '</div>';
+  }
+  function rcSave() {
+    var on = RS.rows.filter(function (x) { return x.on; });
+    var bad = on.filter(function (x) { return !String(x.size || '').trim() || !(+x.cost > 0) || !(+x.qty > 0); })[0];
+    if (bad) { RS.msg = bad.code + ': 사이즈 · 수량 · 매입가를 채워 주세요'; return K.render(); }
+    var st = RS.storeId ? DOC.partner[RS.storeId] : null, n = 0;
+    var docs = on.map(function (x) { n += +x.qty; return { kind: 'phone_buy', id: 'b' + uid(), data: { code: x.code, name: x.name || '', brand: x.brand || '', size: String(x.size).trim(), qty: +x.qty, cost: +x.cost, tag: null, disc: 0, date: RS.date || today(), store: st ? st.name : RS.store || '', storeId: st ? st._id : '', payId: RS.payId || '', via: 'receipt', at: Date.now() } }; });
+    send(docs).then(function () { RS.done = '영수증 ' + n + '개를 매입 등록했어요 — PC 재고에 1분 안에 들어가요'; })
+      .catch(function () { RS.done = '인터넷이 끊겨 이 휴대폰에 모아 뒀어요(' + n + '개) — 연결되면 바로 올려요'; })
+      .then(function () { docs.forEach(function (d) { DOC.phone_buy[d.id] = Object.assign({}, d.data, { _id: d.id }); }); K.render(); });
+  }
+  // 재고 탭: 위에 [영수증 등록] — 영수증 화면이 열려 있으면 그것만
+  function vStockRc() {
+    var file = '<input type="file" id="rcFile" accept="image/*" capture="environment" hidden>';
+    if (RS) return file + vRc();
+    return file + '<div class="rc-top"><button type="button" class="ghost wide" data-rc="pick">영수증 등록 <span class="sub">나이키 · 아디다스 매장 영수증을 찍으면 한 번에 매입 등록</span></button></div>' + vStock2();
+  }
   // ---------- 설정 ----------
   function vSet() {
     var D = day(), ob = outbox().length;
@@ -329,7 +401,7 @@
   }
   K.VIEWS._stockOld = K.vStockOld;
   K.VIEWS.scan = vScan;
-  K.VIEWS.stock = vStock2;
+  K.VIEWS.stock = vStockRc;
   K.VIEWS.set = vSet;
   K.VIEWS.mkt = function () { return K.vMkt(); };
   K.VIEWS.scan.after = function () {
@@ -349,6 +421,8 @@
 
   // ---------- 이벤트 ----------
   document.getElementById('view').addEventListener('click', function (e) {
+    var rb = e.target.closest('[data-rc]');
+    if (rb) { var ra = rb.dataset.rc; if (ra === 'pick') return rcPick(); if (ra === 'close') { RS = null; return K.render(); } if (ra === 'save') return rcSave(); if (ra === 'rows') { RS.showRows = !RS.showRows; return K.render(); } return; }
     var b = e.target.closest('[data-sc]'); var s = e.target.closest('[data-st]');
     if (s) { ST.f = s.dataset.st; return K.render(); }
     if (!b) return; var a = b.dataset.sc;
@@ -390,6 +464,9 @@
   });
   document.getElementById('view').addEventListener('change', function (e) {
     if (e.target.id === 'scTagFile') { var f = e.target.files && e.target.files[0]; if (f) ocrRun(f); return; }
+    if (e.target.id === 'rcFile') { var rf = e.target.files && e.target.files[0]; if (rf) rcRun(rf); return; }
+    if (RS && e.target.dataset.rcK) { var rk = e.target.dataset.rcK; if (rk === 'date') RS.date = e.target.value; if (rk === 'pay') RS.payId = e.target.value; if (rk === 'store') { RS.storeId = e.target.value; if (!RS.storeId) RS.store = (RS.r && RS.r.store) || ''; } return; }
+    if (RS && e.target.dataset.rcI != null) { var ri = RS.rows[+e.target.dataset.rcI], rfld = e.target.dataset.rcF; if (ri) { if (rfld === 'on') ri.on = e.target.checked; else ri[rfld] = e.target.value; RS.msg = ''; K.render(); } return; }
     var k = e.target.dataset.scK;
     if (k === 'store') { var nw = document.querySelector('[data-sc-k=storeNew]'); if (nw) nw.hidden = e.target.value !== '_new'; var p = DOC.partner[e.target.value], dc = document.querySelector('[data-sc-k=disc]'); if (p && p.lastDisc != null && dc && !dc.value) dc.value = p.lastDisc; }
     if (k === 'pay') SC.payId = e.target.value;
