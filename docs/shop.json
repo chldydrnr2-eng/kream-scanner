@@ -1,17 +1,17 @@
 {
  "_설명": "킥스캔 판매자 공개 설정. 앱이 켤 때 읽어요. 빈 칸은 화면에 안 보여요. kakao 와 biz 는 사장님이 채워요. supa.anon 은 비밀번호 재설정 · 휴대폰 보기(m/) 페이지용 공개 키(sb_publishable_…)예요. supa.url 은 휴대폰 보기용 Supabase 주소(https://….supabase.co)예요.",
  "kakao": "",
- "terms": "",
- "privacy": "",
- "refund": "",
+ "terms": "https://chldydrnr2-eng.github.io/kream-scanner/terms/",
+ "privacy": "https://chldydrnr2-eng.github.io/kream-scanner/privacy/",
+ "refund": "https://chldydrnr2-eng.github.io/kream-scanner/refund/",
  "biz": {
-  "name": "",
-  "ceo": "",
+  "name": "엘씨코퍼레이션",
+  "ceo": "이지윤",
   "regNo": "",
   "mailOrderNo": "",
   "addr": "",
-  "tel": "",
-  "email": ""
+  "tel": "010-2742-3806",
+  "email": "yunadesign@choisofficial.com"
  },
  "supa": {
   "url": "https://ahksmyfjeeholrxktili.supabase.co",
