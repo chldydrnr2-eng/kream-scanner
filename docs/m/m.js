@@ -15,7 +15,9 @@
   var ROOT = location.href.replace(/[?#].*$/, '').replace(/m\/(index\.html)?$/, '');
   var CFG = null, ACCESS = '', ACCESS_EXP = 0, EMAIL = '', DATA = null, LOADED_AT = 0, BUSY = false;
   var UI = { tab: LS.get('tab') || 'sum', sales: { seg: 'done', ch: '', per: '30', q: '', n: 50 }, stock: { q: '', n: 60 }, mkt: { seg: 'mine', q: '' } };
-  if (['sum', 'scan', 'stock', 'sales', 'set', 'mkt'].indexOf(UI.tab) < 0) UI.tab = 'sum';
+  // 11/25: 알림을 눌러 들어오면 ?t=drop 처럼 그 탭으로
+  try { var qt = new URLSearchParams(location.search).get('t'); if (qt) { UI.tab = qt; LS.set('tab', qt); if (history.replaceState) history.replaceState(null, '', location.pathname); } } catch (e) {}
+  if (['sum', 'scan', 'stock', 'sales', 'set', 'mkt', 'drop'].indexOf(UI.tab) < 0) UI.tab = 'sum';
   var VIEWS = {};   // 11/22 현장 앱(m2.js)이 더하는 화면: scan · stock · set
 
   // ---------- 서버 ----------

@@ -154,3 +154,19 @@ input:focus,select:focus{border-color:var(--acc)}
 .rc-rows{max-height:220px;overflow:auto;font-size:12px;white-space:pre-wrap;background:var(--bg,rgba(127,127,127,.08));border-radius:8px;padding:8px}
 .rc-it .sc-calc{flex-wrap:nowrap;margin:8px 0 0}.rc-it .sc-calc label{flex:1 1 0;min-width:0}.rc-it .sc-calc input{width:100%;min-width:0}
 .rc input[type=date]{width:100%;min-height:44px}
+
+/* 11/25: 발매 (drop.js) */
+.drp-push{margin-bottom:10px} .drp-pt{display:grid;gap:2px;flex:1;min-width:0} .drp-pt .sub{font-size:12.5px}
+.drp-bar{margin:0 0 10px} .drp-bar .sub{flex:1;font-size:12px}
+.drp-card{margin-bottom:10px;display:grid;gap:10px}
+.drp-top{display:grid;grid-template-columns:64px minmax(0,1fr);gap:12px;align-items:center}
+.drp-top img,.drp-top>span{width:64px;height:64px;border-radius:10px;object-fit:cover;background:var(--soft);display:block}
+.drp-top>div{display:grid;gap:2px;min-width:0} .drp-top b{font-size:14.5px;line-height:1.35} .drp-top .sub{font-size:12px}
+.drp-brand{font-size:11px;font-weight:800;letter-spacing:.03em;color:var(--acc)}
+.drp-sites{display:grid;gap:6px;border-top:1px solid var(--line);padding-top:8px}
+.drp-site{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px}
+.drp-site a,.drp-foot a{font-weight:700;color:var(--acc);text-decoration:none}
+.drp-site a{margin-left:auto}
+.drp-site .sub{font-size:12px}
+.drp-due{color:var(--warn,#d97706);font-weight:700;font-size:12px}
+.drp-foot{display:flex;align-items:center;gap:12px;font-size:13px} .drp-foot b{margin-right:auto}
