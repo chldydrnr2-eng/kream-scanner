@@ -170,3 +170,9 @@ input:focus,select:focus{border-color:var(--acc)}
 .drp-site .sub{font-size:12px}
 .drp-due{color:var(--warn,#d97706);font-weight:700;font-size:12px}
 .drp-foot{display:flex;align-items:center;gap:12px;font-size:13px} .drp-foot b{margin-right:auto}
+
+/* 11/25: 오늘 살 것 (buy.js) */
+.tbm-sum{display:grid;gap:4px;margin-bottom:10px;font-size:14px} .tbm-sum .sub{font-size:12px}
+.tbm-pf{color:var(--ok,#16a34a);font-weight:800}
+.tbm-btns{display:flex;gap:8px;align-items:center} .tbm-btns .primary{margin-left:auto;text-decoration:none;text-align:center}
+.tbm-over{opacity:.75}

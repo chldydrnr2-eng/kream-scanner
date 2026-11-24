@@ -64,16 +64,19 @@
       return '<div class="box drp-card">' + head(p) + '<dl class="kv"><dt>발매일</dt><dd>' + (p.releaseDate ? esc(p.releaseDate.slice(5).replace('-', '/')) + (d != null && d >= 0 ? ' <span class="' + (d <= 1 ? 'drp-due' : 'sub') + '">' + (d === 0 ? '오늘' : d === 1 ? '내일' : 'D-' + d) + '</span>' : '') : '미정') + '</dd><dt>발매가</dt><dd>' + esc(pr) + '</dd><dt>응모처</dt><dd>' + (+p.releaseSiteCount ? p.releaseSiteCount + '곳' : '아직 없음') + '</dd></dl><div class="drp-foot">' + (p.code ? '<a href="' + esc(kream(p.code)) + '" target="_blank" rel="noopener">크림 시세 ↗</a>' : '') + (link(p) ? '<a href="' + esc(link(p)) + '" target="_blank" rel="noopener">슈프라이즈 ↗</a>' : '') + '</div></div>';
     }).join('');
   }
-  function pushBox() {
+  // 11/25: 살 것 탭(buy.js)도 같은 알림 상자를 써요 — 제목 · 설명만 달라요
+  function pushBox(title, sub) {
+    title = title || '새 발매 알림'; sub = sub || '새 응모 · 발매 예정이 올라오면 이 폰으로 알려요';
     var h = '<div class="box drp-push">';
-    if (!pushSup()) h += '<b>새 발매 알림</b><p class="note">' + (ios && !standalone ? '아이폰은 사파리 › 공유 › <b>홈 화면에 추가</b>한 뒤, 홈 화면의 킥스캔 앱에서 알림을 켤 수 있어요.' : '이 브라우저는 알림을 받을 수 없어요 — 안드로이드는 크롬에서 열어 주세요.') + '</p>';
+    if (!pushSup()) h += '<b>' + esc(title) + '</b><p class="note">' + (ios && !standalone ? '아이폰은 사파리 › 공유 › <b>홈 화면에 추가</b>한 뒤, 홈 화면의 킥스캔 앱에서 알림을 켤 수 있어요.' : '이 브라우저는 알림을 받을 수 없어요 — 안드로이드는 크롬에서 열어 주세요.') + '</p>';
     else {
       var on = pushIsOn();
-      h += '<div class="sc-row"><span class="drp-pt"><b>새 발매 알림</b><span class="sub">' + (on ? '이 폰으로 받는 중 · PC 킥스캔이 켜져 있을 때 와요' : '새 응모 · 발매 예정이 올라오면 이 폰으로 알려요') + '</span></span><button type="button" class="' + (on ? 'ghost' : 'primary') + '" data-dr="' + (on ? 'off' : 'on') + '"' + (DR.pushBusy ? ' disabled' : '') + '>' + (on ? '알림 끄기' : '알림 켜기') + '</button></div>';
+      h += '<div class="sc-row"><span class="drp-pt"><b>' + esc(title) + '</b><span class="sub">' + (on ? '이 폰으로 받는 중 · PC 킥스캔이 켜져 있을 때 와요' : esc(sub)) + '</span></span><button type="button" class="' + (on ? 'ghost' : 'primary') + '" data-dr="' + (on ? 'off' : 'on') + '"' + (DR.pushBusy ? ' disabled' : '') + '>' + (on ? '알림 끄기' : '알림 켜기') + '</button></div>';
     }
     if (DR.msg) h += '<p class="note">' + esc(DR.msg) + '</p>';
     return h + '</div>';
   }
+  K.pushBox = pushBox;
   K.VIEWS.drop = function () {
     load(false);
     var relN = 0; if (DR.rel) { var seen = {}; DR.rel.forEach(function (x) { if (!DR.kr || x.isDomesticSite) seen[(x.product && x.product.id) || x.id] = 1; }); relN = Object.keys(seen).length; }
@@ -115,8 +118,8 @@
     }).then(function (sub) {
       var j = sub.toJSON(), id = 'push-' + hash(j.endpoint || '');
       LS.set('pushId', id);
-      return putSub(id, { type: 'push', sub: { endpoint: j.endpoint, keys: j.keys }, ua: navigator.userAgent.slice(0, 80), on: true, kinds: { drop: 1, event: 1 }, status: 'done', at: Date.now() });
-    }).then(function () { LS.set('pushOn', '1'); DR.msg = '알림을 켰어요 — PC 발매 탭 › 알림 설정에서 시험 알림을 보내 볼 수 있어요 (PC 가 1분 안에 받아요)'; })
+      return putSub(id, { type: 'push', sub: { endpoint: j.endpoint, keys: j.keys }, ua: navigator.userAgent.slice(0, 80), on: true, kinds: { drop: 1, event: 1, buy: 1 }, status: 'done', at: Date.now() });
+    }).then(function () { LS.set('pushOn', '1'); DR.msg = '알림을 켰어요 — 새 발매 · 오늘 살 것 알림이 와요. PC 발매 탭 › 알림 설정에서 시험 알림을 보내 볼 수 있어요 (PC 가 1분 안에 받아요)'; })
       .catch(function (e) { DR.msg = String((e && e.message) || e); })
       .then(function () { DR.pushBusy = false; K.render(); });
   }
